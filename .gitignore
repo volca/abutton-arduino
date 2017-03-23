@@ -1,0 +1,5 @@
+.pioenvs
+.piolibdeps
+build
+.DS_Store
+*.swp
