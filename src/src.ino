@@ -3,6 +3,7 @@
 
 #include <DNSServer.h>            //Local DNS Server used for redirecting all requests to the configuration portal
 #include <ESP8266WebServer.h>     //Local WebServer used to serve the configuration portal
+#include <ESP8266HTTPClient.h>
 #include <ESP8266HTTPUpdateServer.h>
 #include <WiFiManager.h>  
 
@@ -10,6 +11,7 @@
 #include <ArduinoJson.h>
 #include <Ticker.h>
 
+#define BTN_PIN         4
 #define LED_PIN         5
 #define NUMPIXELS       1
 
@@ -31,6 +33,11 @@ bool shouldSaveConfig = false;
 void saveConfigCallback () {
 	Serial.println("Should save config");
 	shouldSaveConfig = true;
+}
+
+void factoryReset() {
+    wifiManager.resetSettings();
+    SPIFFS.remove(CONFIG_FILE);
 }
 
 void loadConfig() {
@@ -72,6 +79,8 @@ void blinkHandler() {
 }
 
 void setup() {
+	pinMode(BTN_PIN, OUTPUT);
+	digitalWrite(BTN_PIN, HIGH);
     Serial.begin(115200);
     Serial.println("Start AButton");
     loadConfig();
@@ -81,9 +90,6 @@ void setup() {
 	//set config save notify callback
 	wifiManager.setSaveConfigCallback(saveConfigCallback);
     wifiManager.setAPStaticIPConfig(IPAddress(192,168,1,1), IPAddress(192,168,1,1), IPAddress(255,255,255,0));
-
-    //reset settings - for testing
-    //wifiManager.resetSettings();
 
     // The extra parameters to be configured (can be either global or just in the setup)
     // After connecting, parameter.getValue() will get you the configured value
@@ -95,10 +101,7 @@ void setup() {
     mLedColor = pixels.Color(255, 0, 0);
     mBlink.attach(1, blinkHandler);
     wifiManager.autoConnect("AButton");
-
     mLedColor = pixels.Color(0, 0, 255);
-    mBlink.detach();
-    mBlink.attach(1, blinkHandler);
 
     if (shouldSaveConfig) {
         strcpy(customUrl, customUrlParam.getValue());
@@ -120,6 +123,34 @@ void setup() {
 
     Serial.print("local ip: ");
     Serial.println(WiFi.localIP());
+
+    HTTPClient http;
+    http.begin(customUrl);
+    int httpCode = http.GET();
+
+	// httpCode will be negative on error
+	if(httpCode > 0) {
+		// HTTP header has been send and Server response header has been handled
+		Serial.printf("[HTTP] GET... code: %d\n", httpCode);
+
+		// file found at server
+		if(httpCode == HTTP_CODE_OK) {
+			String payload = http.getString();
+			Serial.println(payload);
+		}
+        http.end();
+		// turn off
+        pixels.setPixelColor(0, pixels.Color(0,0,0));
+        pixels.show();
+		//digitalWrite(BTN_PIN, LOW);
+        delay(2000);
+	} else {
+		Serial.printf("[HTTP] GET... failed, error: %s\n", http.errorToString(httpCode).c_str());
+        http.end();
+	}
+
+    // should not go here
+    factoryReset();
 }
 
 void loop() {
