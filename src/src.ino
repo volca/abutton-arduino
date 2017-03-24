@@ -3,11 +3,10 @@
 
 #include <DNSServer.h>            //Local DNS Server used for redirecting all requests to the configuration portal
 #include <ESP8266WebServer.h>     //Local WebServer used to serve the configuration portal
+#include <ESP8266HTTPUpdateServer.h>
 #include <WiFiManager.h>  
 
 #include <Adafruit_NeoPixel.h>
-#include <ESP8266mDNS.h>
-#include <ArduinoOTA.h>
 #include <ArduinoJson.h>
 #include <Ticker.h>
 
@@ -20,6 +19,7 @@ const char CONFIG_FILE[] = "config.json";
 char customUrl[128];
 
 Adafruit_NeoPixel pixels = Adafruit_NeoPixel(NUMPIXELS, LED_PIN, NEO_GRB + NEO_KHZ800);
+ESP8266HTTPUpdateServer httpUpdater;
 
 //flag for saving data
 bool shouldSaveConfig = false;
@@ -56,6 +56,7 @@ void loadConfig() {
 
 void setup() {
     Serial.begin(115200);
+    Serial.println("Start AButton");
     Serial.println("Loading config");
     loadConfig();
 
@@ -66,7 +67,7 @@ void setup() {
     wifiManager.setAPStaticIPConfig(IPAddress(192,168,1,1), IPAddress(192,168,1,1), IPAddress(255,255,255,0));
 
     //reset settings - for testing
-    wifiManager.resetSettings();
+    //wifiManager.resetSettings();
 
     // The extra parameters to be configured (can be either global or just in the setup)
     // After connecting, parameter.getValue() will get you the configured value
@@ -74,9 +75,29 @@ void setup() {
     WiFiManagerParameter customUrlParam("url", "custom url", customUrl, 128, "");
     wifiManager.addParameter(&customUrlParam);
 
+    pixels.begin();
     wifiManager.autoConnect("AButton");
 
-    pixels.begin();
+    if (shouldSaveConfig) {
+        strcpy(customUrl, customUrlParam.getValue());
+
+        Serial.println("saving config");
+        DynamicJsonBuffer jsonBuffer;
+        JsonObject& json = jsonBuffer.createObject();
+        json["url"] = customUrl;
+
+        File configFile = SPIFFS.open(CONFIG_FILE, "w");
+        json.printTo(Serial);
+        Serial.println("");
+        json.printTo(configFile);
+        configFile.close();
+    }
+
+    ESP8266WebServer server(80);
+    httpUpdater.setup(&server);
+
+    Serial.print("local ip: ");
+    Serial.println(WiFi.localIP());
 }
 
 void loop() {
