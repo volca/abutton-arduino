@@ -20,6 +20,9 @@ char customUrl[128];
 
 Adafruit_NeoPixel pixels = Adafruit_NeoPixel(NUMPIXELS, LED_PIN, NEO_GRB + NEO_KHZ800);
 ESP8266HTTPUpdateServer httpUpdater;
+Ticker mBlink;
+Ticker mBlinkOnce;
+uint32_t mLedColor;
 
 //flag for saving data
 bool shouldSaveConfig = false;
@@ -54,10 +57,23 @@ void loadConfig() {
     }
 }
 
+void setLed(int state) {
+    if (state) {
+        pixels.setPixelColor(0, mLedColor);
+    } else {
+        pixels.setPixelColor(0, pixels.Color(0,0,0));
+    }
+    pixels.show();
+}
+
+void blinkHandler() {
+    setLed(1);
+    mBlinkOnce.once_ms(25, setLed, 0);
+}
+
 void setup() {
     Serial.begin(115200);
     Serial.println("Start AButton");
-    Serial.println("Loading config");
     loadConfig();
 
     WiFiManager wifiManager;
@@ -76,7 +92,13 @@ void setup() {
     wifiManager.addParameter(&customUrlParam);
 
     pixels.begin();
+    mLedColor = pixels.Color(255, 0, 0);
+    mBlink.attach(1, blinkHandler);
     wifiManager.autoConnect("AButton");
+
+    mLedColor = pixels.Color(0, 0, 255);
+    mBlink.detach();
+    mBlink.attach(1, blinkHandler);
 
     if (shouldSaveConfig) {
         strcpy(customUrl, customUrlParam.getValue());
@@ -102,7 +124,5 @@ void setup() {
 
 void loop() {
     Serial.println("loop");
-    pixels.setPixelColor(0, pixels.Color(255,0,0));
-    pixels.show();
     delay(1000);
 }
