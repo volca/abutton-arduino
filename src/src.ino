@@ -8,6 +8,7 @@
 #include <Adafruit_NeoPixel.h>
 #include <ESP8266mDNS.h>
 #include <ArduinoOTA.h>
+#include <ArduinoJson.h>
 #include <Ticker.h>
 
 #define LED_PIN         5
@@ -70,8 +71,8 @@ void setup() {
     // The extra parameters to be configured (can be either global or just in the setup)
     // After connecting, parameter.getValue() will get you the configured value
     // id/name placeholder/prompt default length
-    WiFiManagerParameter customUrl("url", "custom url", customUrl, 128);
-    wifiManager.addParameter(&customUrl);
+    WiFiManagerParameter customUrlParam("url", "custom url", customUrl, 128, "");
+    wifiManager.addParameter(&customUrlParam);
 
     wifiManager.autoConnect("AButton");
 
