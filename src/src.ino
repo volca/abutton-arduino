@@ -31,8 +31,8 @@ bool shouldSaveConfig = false;
 
 //callback notifying us of the need to save config
 void saveConfigCallback () {
-	Serial.println("Should save config");
-	shouldSaveConfig = true;
+    Serial.println("Should save config");
+    shouldSaveConfig = true;
 }
 
 void factoryReset() {
@@ -48,14 +48,14 @@ void loadConfig() {
     }
 
     File configFile = SPIFFS.open("/config.json", "r");
-	size_t size = configFile.size();
-	// Allocate a buffer to store contents of the file.
-	std::unique_ptr<char[]> buf(new char[size]);
+    size_t size = configFile.size();
+    // Allocate a buffer to store contents of the file.
+    std::unique_ptr<char[]> buf(new char[size]);
 
-	configFile.readBytes(buf.get(), size);
-	DynamicJsonBuffer jsonBuffer;
-	JsonObject& json = jsonBuffer.parseObject(buf.get());
-	json.printTo(Serial);
+    configFile.readBytes(buf.get(), size);
+    DynamicJsonBuffer jsonBuffer;
+    JsonObject& json = jsonBuffer.parseObject(buf.get());
+    json.printTo(Serial);
 
     if (json.success()) {
         Serial.println("\nparsed json");
@@ -79,16 +79,16 @@ void blinkHandler() {
 }
 
 void setup() {
-	pinMode(BTN_PIN, OUTPUT);
-	digitalWrite(BTN_PIN, HIGH);
+    pinMode(BTN_PIN, OUTPUT);
+    digitalWrite(BTN_PIN, HIGH);
     Serial.begin(115200);
     Serial.println("Start AButton");
     loadConfig();
 
     WiFiManager wifiManager;
 
-	//set config save notify callback
-	wifiManager.setSaveConfigCallback(saveConfigCallback);
+    //set config save notify callback
+    wifiManager.setSaveConfigCallback(saveConfigCallback);
     wifiManager.setAPStaticIPConfig(IPAddress(192,168,1,1), IPAddress(192,168,1,1), IPAddress(255,255,255,0));
 
     // The extra parameters to be configured (can be either global or just in the setup)
@@ -128,26 +128,26 @@ void setup() {
     http.begin(customUrl);
     int httpCode = http.GET();
 
-	// httpCode will be negative on error
-	if(httpCode > 0) {
-		// HTTP header has been send and Server response header has been handled
-		Serial.printf("[HTTP] GET... code: %d\n", httpCode);
+    // httpCode will be negative on error
+    if(httpCode > 0) {
+        // HTTP header has been send and Server response header has been handled
+        Serial.printf("[HTTP] GET... code: %d\n", httpCode);
 
-		// file found at server
-		if(httpCode == HTTP_CODE_OK) {
-			String payload = http.getString();
-			Serial.println(payload);
-		}
+        // file found at server
+        if(httpCode == HTTP_CODE_OK) {
+            String payload = http.getString();
+            Serial.println(payload);
+        }
         http.end();
-		// turn off
+        // turn off
         pixels.setPixelColor(0, pixels.Color(0,0,0));
         pixels.show();
-		digitalWrite(BTN_PIN, LOW);
+        digitalWrite(BTN_PIN, LOW);
         delay(2000);
-	} else {
-		Serial.printf("[HTTP] GET... failed, error: %s\n", http.errorToString(httpCode).c_str());
+    } else {
+        Serial.printf("[HTTP] GET... failed, error: %s\n", http.errorToString(httpCode).c_str());
         http.end();
-	}
+    }
 
     // should not go here
     factoryReset();
