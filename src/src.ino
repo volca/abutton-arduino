@@ -142,7 +142,7 @@ void setup() {
 		// turn off
         pixels.setPixelColor(0, pixels.Color(0,0,0));
         pixels.show();
-		//digitalWrite(BTN_PIN, LOW);
+		digitalWrite(BTN_PIN, LOW);
         delay(2000);
 	} else {
 		Serial.printf("[HTTP] GET... failed, error: %s\n", http.errorToString(httpCode).c_str());
