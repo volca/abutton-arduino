@@ -35,7 +35,7 @@ void saveConfigCallback () {
     shouldSaveConfig = true;
 }
 
-void factoryReset(WiFiManager wifiManager) {
+void factoryReset(WiFiManager &wifiManager) {
     wifiManager.resetSettings();
     SPIFFS.remove(CONFIG_FILE);
 }
