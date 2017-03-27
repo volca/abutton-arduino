@@ -35,7 +35,7 @@ void saveConfigCallback () {
     shouldSaveConfig = true;
 }
 
-void factoryReset() {
+void factoryReset(WiFiManager wifiManager) {
     wifiManager.resetSettings();
     SPIFFS.remove(CONFIG_FILE);
 }
@@ -150,7 +150,8 @@ void setup() {
     }
 
     // should not go here
-    factoryReset();
+    factoryReset(wifiManager);
+    wifiManager.autoConnect("AButton");
 }
 
 void loop() {
