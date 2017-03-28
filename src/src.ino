@@ -82,7 +82,7 @@ void setup() {
     pinMode(BTN_PIN, OUTPUT);
     digitalWrite(BTN_PIN, HIGH);
     Serial.begin(115200);
-    Serial.println("Start AButton");
+    Serial.println("\r\nStart AButton");
     loadConfig();
 
     WiFiManager wifiManager;
