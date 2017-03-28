@@ -140,8 +140,7 @@ void setup() {
         }
         http.end();
         // turn off
-        pixels.setPixelColor(0, pixels.Color(0,0,0));
-        pixels.show();
+        setLed(0);
         digitalWrite(BTN_PIN, LOW);
         delay(2000);
     } else {
