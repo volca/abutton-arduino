@@ -11,7 +11,7 @@
 #include <ArduinoJson.h>
 #include <Ticker.h>
 
-#define BTN_PIN         4
+#define EN_PIN         4
 #define LED_PIN         5
 #define NUMPIXELS       1
 
@@ -79,8 +79,8 @@ void blinkHandler() {
 }
 
 void setup() {
-    pinMode(BTN_PIN, OUTPUT);
-    digitalWrite(BTN_PIN, HIGH);
+    pinMode(EN_PIN, OUTPUT);
+    digitalWrite(EN_PIN, HIGH);
     Serial.begin(115200);
     Serial.println("\r\nStart AButton");
     loadConfig();
@@ -141,7 +141,7 @@ void setup() {
         http.end();
         // turn off
         setLed(0);
-        digitalWrite(BTN_PIN, LOW);
+        digitalWrite(EN_PIN, LOW);
         delay(2000);
     } else {
         Serial.printf("[HTTP] GET... failed, error: %s\n", http.errorToString(httpCode).c_str());
