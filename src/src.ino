@@ -96,6 +96,8 @@ void blinkHandler() {
 }
 
 void setup() {
+    // Boot up
+    // Send a HIGH signal through a diode to CH_EN
     pinMode(EN_PIN, OUTPUT);
     digitalWrite(EN_PIN, HIGH);
     Serial.begin(115200);
@@ -156,7 +158,8 @@ void setup() {
         digitalWrite(EN_PIN, LOW);
     }
 
-    // should not go here
+    // should not go here or button hold 
+    // factory reset
     mLedColor = pixels.Color(255, 0, 0);
     delay(1500);
     factoryReset(wifiManager);
