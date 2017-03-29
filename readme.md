@@ -2,8 +2,16 @@ Rewrite [AButton](http://wiki.aprbrother.com/wiki/AButton) with Arduino
 
 ### How To
 
+#### With PlatformIO
+
 * Install [platformio](https://github.com/esp8266/arduino#using-platformio)
 * Run command ```make flash``` to upload firmware
+
+#### With Arduino
+
+* Install ESP8266 Arduino core
+* Install [libraries](#libraries-dependency) with library manager
+* Open src.ino and compile
 
 ### LED Status
 
@@ -17,7 +25,7 @@ Rewrite [AButton](http://wiki.aprbrother.com/wiki/AButton) with Arduino
 * ArduinoJson
 * WiFiManager
 
-See the comments in [platform.ini](platform.ini)
+See the comments in [platformio.ini](platformio.ini)
 
 ### OTA Upgrade
 
