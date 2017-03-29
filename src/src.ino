@@ -19,12 +19,13 @@ const char CONFIG_FILE[] = "config.json";
 
 //define your default values here, if there are different values in config.json, they are overwritten.
 char customUrl[128];
-
+uint32_t mLedColor;
 Adafruit_NeoPixel pixels = Adafruit_NeoPixel(NUMPIXELS, LED_PIN, NEO_GRB + NEO_KHZ800);
 ESP8266HTTPUpdateServer httpUpdater;
+ESP8266WebServer server(80);
+WiFiManagerParameter customUrlParam("url", "custom url", customUrl, 128, "");
 Ticker mBlink;
 Ticker mBlinkOnce;
-uint32_t mLedColor;
 
 //flag for saving data
 bool shouldSaveConfig = false;
@@ -56,12 +57,28 @@ void loadConfig() {
     DynamicJsonBuffer jsonBuffer;
     JsonObject& json = jsonBuffer.parseObject(buf.get());
     json.printTo(Serial);
+    configFile.close();
 
     if (json.success()) {
         Serial.println("\nparsed json");
         strcpy(customUrl, json["url"]);
         Serial.println("Parsed config");
     }
+}
+
+void saveConfig() {
+    strcpy(customUrl, customUrlParam.getValue());
+
+    Serial.println("saving config");
+    DynamicJsonBuffer jsonBuffer;
+    JsonObject& json = jsonBuffer.createObject();
+    json["url"] = customUrl;
+
+    File configFile = SPIFFS.open(CONFIG_FILE, "w+");
+    json.printTo(Serial);
+    json.printTo(configFile);
+    configFile.close();
+    shouldSaveConfig = false;
 }
 
 void setLed(int state) {
@@ -94,7 +111,6 @@ void setup() {
     // The extra parameters to be configured (can be either global or just in the setup)
     // After connecting, parameter.getValue() will get you the configured value
     // id/name placeholder/prompt default length
-    WiFiManagerParameter customUrlParam("url", "custom url", customUrl, 128, "");
     wifiManager.addParameter(&customUrlParam);
 
     pixels.begin();
@@ -104,57 +120,54 @@ void setup() {
     mLedColor = pixels.Color(0, 0, 255);
 
     if (shouldSaveConfig) {
-        strcpy(customUrl, customUrlParam.getValue());
-
-        Serial.println("saving config");
-        DynamicJsonBuffer jsonBuffer;
-        JsonObject& json = jsonBuffer.createObject();
-        json["url"] = customUrl;
-
-        File configFile = SPIFFS.open(CONFIG_FILE, "w");
-        json.printTo(Serial);
-        Serial.println("");
-        json.printTo(configFile);
-        configFile.close();
+        saveConfig();
     }
-
-    ESP8266WebServer server(80);
-    httpUpdater.setup(&server);
 
     Serial.print("local ip: ");
     Serial.println(WiFi.localIP());
 
-    HTTPClient http;
-    http.begin(customUrl);
-    int httpCode = http.GET();
+    if (strlen(customUrl)) {
+        HTTPClient http;
+        Serial.print("request url: ");
+        Serial.println(customUrl);
+        http.begin(customUrl);
+        int httpCode = http.GET();
 
-    // httpCode will be negative on error
-    if(httpCode > 0) {
-        // HTTP header has been send and Server response header has been handled
-        Serial.printf("[HTTP] GET... code: %d\n", httpCode);
+        Serial.printf("http code %d\r\n", httpCode);
+        // httpCode will be negative on error
+        if(httpCode > 0) {
+            // HTTP header has been send and Server response header has been handled
+            Serial.printf("[HTTP] GET... code: %d\n", httpCode);
 
-        // file found at server
-        if(httpCode == HTTP_CODE_OK) {
-            String payload = http.getString();
-            Serial.println(payload);
-            mLedColor = pixels.Color(0, 255, 0);
+            // file found at server
+            if(httpCode == HTTP_CODE_OK) {
+                String payload = http.getString();
+                Serial.println(payload);
+                mLedColor = pixels.Color(0, 255, 0);
+            }
+            http.end();
+            delay(2000);
+            setLed(0);
+            // turn off
+            digitalWrite(EN_PIN, LOW);
+        } else {
+            Serial.printf("[HTTP] GET... failed, error: %s\n", http.errorToString(httpCode).c_str());
+            http.end();
         }
-        http.end();
-        // turn off
-        setLed(0);
-        digitalWrite(EN_PIN, LOW);
-        delay(2000);
-    } else {
-        Serial.printf("[HTTP] GET... failed, error: %s\n", http.errorToString(httpCode).c_str());
-        http.end();
     }
 
     // should not go here
+    mLedColor = pixels.Color(255, 0, 0);
     factoryReset(wifiManager);
     wifiManager.autoConnect("AButton");
+    if (shouldSaveConfig) {
+        saveConfig();
+    }
+    httpUpdater.setup(&server);
 }
 
 void loop() {
     Serial.println("loop");
+    server.handleClient();
     delay(1000);
 }
