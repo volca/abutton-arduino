@@ -137,6 +137,7 @@ void setup() {
         if(httpCode == HTTP_CODE_OK) {
             String payload = http.getString();
             Serial.println(payload);
+            mLedColor = pixels.Color(0, 255, 0);
         }
         http.end();
         // turn off
