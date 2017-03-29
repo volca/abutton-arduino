@@ -164,7 +164,9 @@ void setup() {
     if (shouldSaveConfig) {
         saveConfig();
     }
+    Serial.println("\r\nstart OTA server\r\n");
     httpUpdater.setup(&server);
+    server.begin();
 }
 
 void loop() {
