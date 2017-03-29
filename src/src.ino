@@ -158,6 +158,7 @@ void setup() {
 
     // should not go here
     mLedColor = pixels.Color(255, 0, 0);
+    delay(1500);
     factoryReset(wifiManager);
     wifiManager.autoConnect("AButton");
     if (shouldSaveConfig) {
