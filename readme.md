@@ -1,6 +1,6 @@
 Rewrite [AButton](http://wiki.aprbrother.com/wiki/AButton) with Arduino
 
-=== OTA Upgrade ===
+### OTA Upgrade
 
 * Keep long press button
 * Wait for green LED link -> red LED blink
