@@ -48,7 +48,7 @@ void loadConfig() {
         return;
     }
 
-    File configFile = SPIFFS.open("/config.json", "r");
+    File configFile = SPIFFS.open(CONFIG_FILE, "r");
     size_t size = configFile.size();
     // Allocate a buffer to store contents of the file.
     std::unique_ptr<char[]> buf(new char[size]);
@@ -145,15 +145,15 @@ void setup() {
                 Serial.println(payload);
                 mLedColor = pixels.Color(0, 255, 0);
             }
-            http.end();
-            delay(2000);
-            setLed(0);
-            // turn off
-            digitalWrite(EN_PIN, LOW);
         } else {
             Serial.printf("[HTTP] GET... failed, error: %s\n", http.errorToString(httpCode).c_str());
-            http.end();
         }
+
+        http.end();
+        delay(2000);
+        setLed(0);
+        // turn off
+        digitalWrite(EN_PIN, LOW);
     }
 
     // should not go here
