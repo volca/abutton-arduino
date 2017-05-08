@@ -3,7 +3,7 @@
 
 #include <DNSServer.h>            //Local DNS Server used for redirecting all requests to the configuration portal
 #include <ESP8266WebServer.h>     //Local WebServer used to serve the configuration portal
-#include <ESP8266HTTPClient.h>
+#include <PubSubClient.h>
 #include <ESP8266HTTPUpdateServer.h>
 #include <WiFiManager.h>  
 
@@ -11,21 +11,37 @@
 #include <ArduinoJson.h>
 #include <Ticker.h>
 
-#define EN_PIN         4
+#define EN_PIN          4
 #define LED_PIN         5
 #define NUMPIXELS       1
+
+#define debug_println(x)            LOG_SERIAL.println(x)
+#define debug_printf(x, ...)        LOG_SERIAL.printf((x), __VA_ARGS__)
+#define debug_print(x)              LOG_SERIAL.print(x)
 
 const char CONFIG_FILE[] = "config.json";
 
 //define your default values here, if there are different values in config.json, they are overwritten.
-char customUrl[128];
 uint32_t mLedColor;
 Adafruit_NeoPixel pixels = Adafruit_NeoPixel(NUMPIXELS, LED_PIN, NEO_GRB + NEO_KHZ800);
 ESP8266HTTPUpdateServer httpUpdater;
 ESP8266WebServer server(80);
-WiFiManagerParameter customUrlParam("url", "custom url", customUrl, 128, "");
+
 Ticker mBlink;
 Ticker mBlinkOnce;
+
+WiFiClient wifiClient;
+PubSubClient mqtt(wifiClient);
+
+char mqttServer[64];
+char mqttPort[5];
+char mqttUser[16];
+char mqttPass[16];
+
+WiFiManagerParameter customMqttServer("server", "custom MQTT server", mqttServer, 64, "");
+WiFiManagerParameter customMqttPort("port", "custom MQTT port", mqttPort, 5, "");
+WiFiManagerParameter customMqttUser("user", "custom MQTT user", mqttUser, 16, "");
+WiFiManagerParameter customMqttPass("pass", "custom MQTT password", mqttPass, 16, "");
 
 //flag for saving data
 bool shouldSaveConfig = false;
@@ -67,12 +83,18 @@ void loadConfig() {
 }
 
 void saveConfig() {
-    strcpy(customUrl, customUrlParam.getValue());
+    strcpy(mqttServer, customMqttServer.getValue());
+    strcpy(mqttPort, customMqttPort.getValue());
+    strcpy(mqttUser, customMqttUser.getValue());
+    strcpy(mqttPass, customMqttPass.getValue());
 
     Serial.println("saving config");
     DynamicJsonBuffer jsonBuffer;
     JsonObject& json = jsonBuffer.createObject();
-    json["url"] = customUrl;
+    json["server"] = mqttServer;
+    json["port"] = mqttPort;
+    json["user"] = mqttUser;
+    json["pass"] = mqttPass;
 
     File configFile = SPIFFS.open(CONFIG_FILE, "w+");
     json.printTo(Serial);
@@ -95,6 +117,29 @@ void blinkHandler() {
     mBlinkOnce.once_ms(25, setLed, 0);
 }
 
+bool mqttConnect() {
+    debug_print("Attempting MQTT connection...");
+
+    // Attempt to connect
+    String id = "abutton-";
+    char mClientId[32];
+    id += String(ESP.getChipId(), DEC);
+    strcpy(clientId, id.c_str());
+
+    if (mqttUser && mqttPass) {
+        mqtt.connect(MQTT::Connect(mClientId)
+                 .set_auth(mqttUser, mqttPass));
+    } else {
+        mqtt.connect(clientId);
+    }
+
+    if (mqtt.connected()) {
+        debug_println("connected");
+    } else {
+        delay(1000);
+    }
+}
+
 void setup() {
     // Boot up
     // Send a HIGH signal through a diode to CH_EN
@@ -113,7 +158,10 @@ void setup() {
     // The extra parameters to be configured (can be either global or just in the setup)
     // After connecting, parameter.getValue() will get you the configured value
     // id/name placeholder/prompt default length
-    wifiManager.addParameter(&customUrlParam);
+    wifiManager.addParameter(&customMqttServer);
+    wifiManager.addParameter(&customMqttPort);
+    wifiManager.addParameter(&customMqttUser);
+    wifiManager.addParameter(&customMqttPass);
 
     pixels.begin();
     mLedColor = pixels.Color(255, 0, 0);
@@ -128,30 +176,21 @@ void setup() {
     Serial.print("local ip: ");
     Serial.println(WiFi.localIP());
 
-    if (strlen(customUrl)) {
-        HTTPClient http;
-        Serial.print("request url: ");
-        Serial.println(customUrl);
-        http.begin(customUrl);
-        int httpCode = http.GET();
+    if (strlen(mqttServer)) {
+        Serial.print("request server: ");
+        Serial.println(mqttServer);
+        mqtt.set_server(String(mqttServer), mqttPort);
+        mqttConnect();
+        char message[] = "ok";
 
-        Serial.printf("http code %d\r\n", httpCode);
-        // httpCode will be negative on error
-        if(httpCode > 0) {
-            // HTTP header has been send and Server response header has been handled
-            Serial.printf("[HTTP] GET... code: %d\n", httpCode);
-
-            // file found at server
-            if(httpCode == HTTP_CODE_OK) {
-                String payload = http.getString();
-                Serial.println(payload);
-                mLedColor = pixels.Color(0, 255, 0);
-            }
+        if(!mqtt.publish("abutton", message)) {
+            Serial.printf("[MQTT] Publish failed\n");
         } else {
-            Serial.printf("[HTTP] GET... failed, error: %s\n", http.errorToString(httpCode).c_str());
+            String payload = http.getString();
+            Serial.println(payload);
+            mLedColor = pixels.Color(0, 255, 0);
         }
 
-        http.end();
         delay(2000);
         setLed(0);
         // turn off
