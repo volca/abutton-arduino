@@ -15,6 +15,8 @@
 #define LED_PIN         5
 #define NUMPIXELS       1
 
+#define LOG_SERIAL  Serial
+
 #define debug_println(x)            LOG_SERIAL.println(x)
 #define debug_printf(x, ...)        LOG_SERIAL.printf((x), __VA_ARGS__)
 #define debug_print(x)              LOG_SERIAL.print(x)
@@ -77,7 +79,10 @@ void loadConfig() {
 
     if (json.success()) {
         Serial.println("\nparsed json");
-        strcpy(customUrl, json["url"]);
+        strcpy(mqttServer, json["server"]);
+        strcpy(mqttPort, json["port"]);
+        strcpy(mqttUser, json["user"]);
+        strcpy(mqttPass, json["pass"]);
         Serial.println("Parsed config");
     }
 }
@@ -122,12 +127,12 @@ bool mqttConnect() {
 
     // Attempt to connect
     String id = "abutton-";
-    char mClientId[32];
+    char clientId[32];
     id += String(ESP.getChipId(), DEC);
     strcpy(clientId, id.c_str());
 
     if (mqttUser && mqttPass) {
-        mqtt.connect(MQTT::Connect(mClientId)
+        mqtt.connect(MQTT::Connect(clientId)
                  .set_auth(mqttUser, mqttPass));
     } else {
         mqtt.connect(clientId);
@@ -179,15 +184,14 @@ void setup() {
     if (strlen(mqttServer)) {
         Serial.print("request server: ");
         Serial.println(mqttServer);
-        mqtt.set_server(String(mqttServer), mqttPort);
+        uint16_t port = String(mqttPort).toInt();
+        mqtt.set_server(String(mqttServer), port);
         mqttConnect();
         char message[] = "ok";
 
         if(!mqtt.publish("abutton", message)) {
             Serial.printf("[MQTT] Publish failed\n");
         } else {
-            String payload = http.getString();
-            Serial.println(payload);
             mLedColor = pixels.Color(0, 255, 0);
         }
 
