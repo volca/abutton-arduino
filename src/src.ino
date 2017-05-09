@@ -145,6 +145,27 @@ bool mqttConnect() {
     }
 }
 
+void mqttCallback(const MQTT::Publish& pub) {
+    Serial.print(pub.topic());
+    Serial.print(" => ");
+    Serial.println(pub.payload_string());
+
+    // response should be json string 
+    // such as {"id": "AB1234", "r": 255, "g": 0, "b":128}
+    DynamicJsonBuffer jsonBuffer;
+    JsonObject& json = jsonBuffer.parseObject(pub.payload_string());
+
+    String chipId = String(ESP.getChipId(), DEC);
+
+    if (chipId.equals(String(json["id"].as<char *>()))) {
+        mLedColor = pixels.Color(json["r"], json["g"], json["b"]);
+    }
+    delay(2000);
+
+    // turn off
+    digitalWrite(EN_PIN, LOW);
+}
+
 void setup() {
     // Boot up
     // Send a HIGH signal through a diode to CH_EN
@@ -192,13 +213,15 @@ void setup() {
         if(!mqtt.publish("abutton", message)) {
             Serial.printf("[MQTT] Publish failed\n");
         } else {
+            mqtt.set_callback(mqttCallback);
+            mqtt.subscribe("abutton/led");
             mLedColor = pixels.Color(0, 255, 0);
         }
 
         delay(2000);
         setLed(0);
         // turn off
-        digitalWrite(EN_PIN, LOW);
+        // digitalWrite(EN_PIN, LOW);
     }
 
     // should not go here or button hold 
