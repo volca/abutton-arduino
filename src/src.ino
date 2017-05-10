@@ -47,6 +47,7 @@ WiFiManagerParameter customMqttPass("pass", "custom MQTT password", mqttPass, 16
 
 //flag for saving data
 bool shouldSaveConfig = false;
+char clientId[32];
 
 //callback notifying us of the need to save config
 void saveConfigCallback () {
@@ -126,11 +127,6 @@ bool mqttConnect() {
     debug_print("Attempting MQTT connection...");
 
     // Attempt to connect
-    String id = "abutton-";
-    char clientId[32];
-    id += String(ESP.getChipId(), DEC);
-    strcpy(clientId, id.c_str());
-
     if (mqttUser && mqttPass) {
         mqtt.connect(MQTT::Connect(clientId)
                  .set_auth(mqttUser, mqttPass));
@@ -151,19 +147,21 @@ void mqttCallback(const MQTT::Publish& pub) {
     Serial.println(pub.payload_string());
 
     // response should be json string 
-    // such as {"id": "AB1234", "r": 255, "g": 0, "b":128}
+    // such as {"id": "AB1234", "r": 255, "g": 0, "b":128, "delay": 2000}
     DynamicJsonBuffer jsonBuffer;
     JsonObject& json = jsonBuffer.parseObject(pub.payload_string());
 
     String chipId = String(ESP.getChipId(), DEC);
-
     if (chipId.equals(String(json["id"].as<char *>()))) {
         mLedColor = pixels.Color(json["r"], json["g"], json["b"]);
     }
-    delay(2000);
 
-    // turn off
-    digitalWrite(EN_PIN, LOW);
+    if (json["delay"] > 0) {
+        delay(json["delay"]);
+
+        // Put the enable pin for ESP8266 to LOW, turn off whole button
+        digitalWrite(EN_PIN, LOW);
+    }
 }
 
 void setup() {
@@ -199,6 +197,10 @@ void setup() {
         saveConfig();
     }
 
+    String id = "AB";
+    id += String(ESP.getChipId(), DEC);
+    strcpy(clientId, id.c_str());
+
     Serial.print("local ip: ");
     Serial.println(WiFi.localIP());
 
@@ -208,13 +210,14 @@ void setup() {
         uint16_t port = String(mqttPort).toInt();
         mqtt.set_server(String(mqttServer), port);
         mqttConnect();
-        char message[] = "ok";
+        char message[128];
+        sprintf(message, "{\"id\": \"%s\", \"state\": \"pushed\"}", clientId); 
 
-        if(!mqtt.publish("abutton", message)) {
+        if(!mqtt.publish("button", message)) {
             Serial.printf("[MQTT] Publish failed\n");
         } else {
             mqtt.set_callback(mqttCallback);
-            mqtt.subscribe("abutton/led");
+            mqtt.subscribe("button/led");
             mLedColor = pixels.Color(0, 255, 0);
         }
 
