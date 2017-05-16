@@ -2,6 +2,10 @@ Rewrite [AButton](http://wiki.aprbrother.com/wiki/AButton) with Arduino
 
 ### How To
 
+#### Hardware 
+
+* Cut the jumper SW-SPDT to VDD. ESP8266 keep working
+
 #### With PlatformIO
 
 * Install [platformio](https://github.com/esp8266/arduino#using-platformio)

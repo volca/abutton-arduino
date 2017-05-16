@@ -11,7 +11,7 @@
 #include <ArduinoJson.h>
 #include <Ticker.h>
 
-#define EN_PIN          4
+#define BUTTON_PIN      4
 #define LED_PIN         5
 #define NUMPIXELS       1
 
@@ -158,17 +158,46 @@ void mqttCallback(const MQTT::Publish& pub) {
 
     if (json["delay"] > 0) {
         delay(json["delay"]);
-
-        // Put the enable pin for ESP8266 to LOW, turn off whole button
-        digitalWrite(EN_PIN, LOW);
+        mLedColor = pixels.Color(0, 0, 0);
+        // Useless, Put the enable pin for ESP8266 to LOW, turn off whole button
+        // digitalWrite(EN_PIN, LOW);
     }
+}
+
+void buttonPressed() {
+    detachInterrupt(BUTTON_PIN);
+    // button pressed
+
+    if (strlen(mqttServer)) {
+        Serial.print("request server: ");
+        Serial.println(mqttServer);
+        uint16_t port = String(mqttPort).toInt();
+        mqtt.set_server(String(mqttServer), port);
+        mqttConnect();
+        char message[128];
+        sprintf(message, "{\"id\": \"%s\", \"state\": \"pushed\"}", clientId); 
+
+        if(!mqtt.publish("button", message)) {
+            Serial.printf("[MQTT] Publish failed\n");
+        } else {
+            mqtt.set_callback(mqttCallback);
+            mqtt.subscribe("button/led");
+            mLedColor = pixels.Color(0, 255, 0);
+        }
+
+        delay(2000);
+        setLed(0);
+        // turn off
+        // digitalWrite(EN_PIN, LOW);
+    }
+
+    attachInterrupt(BUTTON_PIN, buttonPressed, RISING);
 }
 
 void setup() {
     // Boot up
-    // Send a HIGH signal through a diode to CH_EN
-    pinMode(EN_PIN, OUTPUT);
-    digitalWrite(EN_PIN, HIGH);
+    pinMode(BUTTON_PIN, INPUT);
+    attachInterrupt(BUTTON_PIN, buttonPressed, RISING);
     Serial.begin(115200);
     Serial.println("\r\nStart AButton");
     loadConfig();
@@ -203,29 +232,6 @@ void setup() {
 
     Serial.print("local ip: ");
     Serial.println(WiFi.localIP());
-
-    if (strlen(mqttServer)) {
-        Serial.print("request server: ");
-        Serial.println(mqttServer);
-        uint16_t port = String(mqttPort).toInt();
-        mqtt.set_server(String(mqttServer), port);
-        mqttConnect();
-        char message[128];
-        sprintf(message, "{\"id\": \"%s\", \"state\": \"pushed\"}", clientId); 
-
-        if(!mqtt.publish("button", message)) {
-            Serial.printf("[MQTT] Publish failed\n");
-        } else {
-            mqtt.set_callback(mqttCallback);
-            mqtt.subscribe("button/led");
-            mLedColor = pixels.Color(0, 255, 0);
-        }
-
-        delay(2000);
-        setLed(0);
-        // turn off
-        // digitalWrite(EN_PIN, LOW);
-    }
 
     // should not go here or button hold 
     // factory reset
