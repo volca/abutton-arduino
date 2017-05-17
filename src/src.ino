@@ -123,8 +123,12 @@ void blinkHandler() {
     mBlinkOnce.once_ms(25, setLed, 0);
 }
 
-bool mqttConnect() {
+void mqttConnect() {
     debug_print("Attempting MQTT connection...");
+
+    if (mqtt.connected()) {
+        return;
+    }
 
     // Attempt to connect
     if (mqttUser && mqttPass) {
