@@ -11,7 +11,7 @@
 #include <ArduinoJson.h>
 #include <Ticker.h>
 
-#define BUTTON_PIN      4
+#define BUTTON_PIN      13
 #define LED_PIN         5
 #define NUMPIXELS       1
 
@@ -47,7 +47,9 @@ WiFiManagerParameter customMqttPass("pass", "custom MQTT password", mqttPass, 16
 
 //flag for saving data
 bool shouldSaveConfig = false;
+
 char clientId[32];
+uint8_t isPressed = 0;
 
 //callback notifying us of the need to save config
 void saveConfigCallback () {
@@ -79,7 +81,7 @@ void loadConfig() {
     configFile.close();
 
     if (json.success()) {
-        Serial.println("\nparsed json");
+        Serial.println("\r\nparsed json");
         strcpy(mqttServer, json["server"]);
         strcpy(mqttPort, json["port"]);
         strcpy(mqttUser, json["user"]);
@@ -123,28 +125,6 @@ void blinkHandler() {
     mBlinkOnce.once_ms(25, setLed, 0);
 }
 
-void mqttConnect() {
-    debug_print("Attempting MQTT connection...");
-
-    if (mqtt.connected()) {
-        return;
-    }
-
-    // Attempt to connect
-    if (mqttUser && mqttPass) {
-        mqtt.connect(MQTT::Connect(clientId)
-                 .set_auth(mqttUser, mqttPass));
-    } else {
-        mqtt.connect(clientId);
-    }
-
-    if (mqtt.connected()) {
-        debug_println("connected");
-    } else {
-        delay(1000);
-    }
-}
-
 void mqttCallback(const MQTT::Publish& pub) {
     Serial.print(pub.topic());
     Serial.print(" => ");
@@ -168,40 +148,60 @@ void mqttCallback(const MQTT::Publish& pub) {
     }
 }
 
-void buttonPressed() {
-    detachInterrupt(BUTTON_PIN);
-    // button pressed
+void mqttConnect() {
+    debug_print("Attempting MQTT connection...");
 
-    if (strlen(mqttServer)) {
+    if (mqtt.connected()) {
+        return;
+    }
+
+    // Attempt to connect
+    mqtt.set_callback(mqttCallback);
+    mqtt.set_server(mqttServer, String(mqttPort).toInt());
+    if (mqttUser && mqttPass) {
+        mqtt.connect(MQTT::Connect(clientId)
+            .set_auth(mqttUser, mqttPass));
+    } else {
+        mqtt.connect(clientId);
+    }
+
+    if (mqtt.connected()) {
+        debug_println("connected");
+    } 
+}
+
+void buttonHandler() {
+    if (isPressed && strlen(mqttServer)) {
+        Serial.println("Button pressed.");
         Serial.print("request server: ");
         Serial.println(mqttServer);
-        uint16_t port = String(mqttPort).toInt();
-        mqtt.set_server(String(mqttServer), port);
         mqttConnect();
+        delay(300);
         char message[128];
         sprintf(message, "{\"id\": \"%s\", \"state\": \"pushed\"}", clientId); 
 
         if(!mqtt.publish("button", message)) {
-            Serial.printf("[MQTT] Publish failed\n");
+            Serial.printf("\r\n[MQTT] Publish failed\r\n");
         } else {
-            mqtt.set_callback(mqttCallback);
+            Serial.printf("\r\n[MQTT] Publish ok\r\n");
             mqtt.subscribe("button/led");
-            mLedColor = pixels.Color(0, 255, 0);
+            mLedColor = pixels.Color(0, 0, 255);
         }
 
-        delay(2000);
-        setLed(0);
-        // turn off
-        // digitalWrite(EN_PIN, LOW);
+        attachInterrupt(BUTTON_PIN, buttonPressed, FALLING);
+        isPressed = 0;
     }
+}
 
-    attachInterrupt(BUTTON_PIN, buttonPressed, RISING);
+void buttonPressed() {
+    // Don't call delay from an interrupt handler. Or it will crash
+    detachInterrupt(BUTTON_PIN);
+    isPressed = 1;
 }
 
 void setup() {
     // Boot up
-    pinMode(BUTTON_PIN, INPUT);
-    attachInterrupt(BUTTON_PIN, buttonPressed, RISING);
+    pinMode(BUTTON_PIN, INPUT_PULLUP);
     Serial.begin(115200);
     Serial.println("\r\nStart AButton");
     loadConfig();
@@ -225,6 +225,7 @@ void setup() {
     mBlink.attach(1, blinkHandler);
     wifiManager.autoConnect("AButton");
     mLedColor = pixels.Color(0, 0, 255);
+    attachInterrupt(BUTTON_PIN, buttonPressed, FALLING);
 
     if (shouldSaveConfig) {
         saveConfig();
@@ -236,13 +237,21 @@ void setup() {
 
     Serial.print("local ip: ");
     Serial.println(WiFi.localIP());
+    Serial.print("clientId: ");
+    Serial.println(clientId);
 
-    // should not go here or button hold 
-    // factory reset
     mLedColor = pixels.Color(255, 0, 0);
     delay(1500);
-    factoryReset(wifiManager);
-    wifiManager.autoConnect("AButton");
+    //factoryReset(wifiManager);
+
+    if (!wifiManager.autoConnect("AButton")) {
+        Serial.println("failed to connect and hit timeout");
+        delay(3000);
+        //reset and try again, or maybe put it to deep sleep
+        ESP.reset();
+        delay(5000);
+    }
+
     if (shouldSaveConfig) {
         saveConfig();
     }
@@ -252,7 +261,7 @@ void setup() {
 }
 
 void loop() {
-    Serial.println("loop");
     server.handleClient();
-    delay(1000);
+    buttonHandler();
+    delay(10);
 }
